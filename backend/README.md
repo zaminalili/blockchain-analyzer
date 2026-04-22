@@ -52,17 +52,17 @@ D3.js Force Graph üçün node + link data.
 
 ---
 
-## Risk Skoru Məntiqi
+## Risk qiymətləndirmə məntiqi
 
 | Skor   | Səviyyə | Tövsiyə                        |
 |--------|---------|--------------------------------|
-| 0–39   | LOW     | Adi monitorinq                 |
-| 40–69  | MEDIUM  | Əlavə araşdırma                |
-| 70–100 | HIGH    | Dərhal istintaq açılması       |
+| 0–39   | Aşağı     | Adi monitorinq                 |
+| 40–69  | Orta  | Əlavə araşdırma                |
+| 70–100 | Yüksək    | Dərhal istintaq açılması       |
 
-### Aşkarlanan Patternlər
+### Aşkarlanan qanunauyğunluqlar
 
-| Pattern        | Ağırlıq | Açıqlama                              |
+| Qanunauyğunluq        | Ağırlıq | Açıqlama                              |
 |----------------|---------|---------------------------------------|
 | `FAN_OUT`      | 25      | 1 input → 5+ output (mixing əlaməti) |
 | `LARGE_CLUSTER`| 30      | 3+ ünvan eyni sahibə aid              |
@@ -71,11 +71,11 @@ D3.js Force Graph üçün node + link data.
 
 ---
 
-## Fayl Strukturu
+## Fayl strukturu
 
 ```
 blockchain_analyzer/
-├── api.py          ← FastAPI app (bu fayl)
+├── api.py          ← FastAPI app
 ├── fetcher.py      ← BTC + ETH API çağırışları
 ├── graph.py        ← NetworkX analiz + risk scoring
 ├── models.py       ← Pydantic sxemləri
@@ -83,14 +83,3 @@ blockchain_analyzer/
 └── requirements.txt
 ```
 
----
-
-## Növbəti Addım: React Dashboard
-
-`/graph/{chain}/{address}` endpointi D3.js Force-Directed Graph üçün
-hazır `{nodes, links}` formatında data qaytarır.
-
-```
-npm create vite@latest frontend -- --template react
-cd frontend && npm install d3
-```
