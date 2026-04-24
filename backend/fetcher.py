@@ -19,20 +19,13 @@ def fetch_btc_address(address: str, limit: int = 20) -> Optional[dict]:
     """Bitcoin ünvanının tranzaksiyalarını çək."""
     url = f"{BTC_API}/addrs/{address}/full"
     params = {"limit": limit, "includeHex": False}
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            r = requests.get(url, params=params, timeout=10)
-            if r.status_code == 429:
-                print(f"[BTC] 429 Limit aşıldı. Gözləyirəm... ({attempt + 1}/{max_retries})")
-                time.sleep(2 ** attempt)
-                continue
-            r.raise_for_status()
-            return r.json()
-        except requests.exceptions.RequestException as e:
-            print(f"[BTC] Fetch xətası: {e}")
-            return None
-    return None
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        r.raise_for_status()
+        return r.json()
+    except requests.exceptions.RequestException as e:
+        print(f"[BTC] Fetch xətası: {e}")
+        return None
 
 
 def fetch_eth_address(address: str, limit: int = 20) -> Optional[dict]:
@@ -48,43 +41,29 @@ def fetch_eth_address(address: str, limit: int = 20) -> Optional[dict]:
         "sort":    "desc",
         "apikey":  ETHERSCAN_KEY,
     }
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            r = requests.get(ETH_API, params=params, timeout=10)
-            if r.status_code == 429:
-                print(f"[ETH] 429 Limit aşıldı. Gözləyirəm... ({attempt + 1}/{max_retries})")
-                time.sleep(2 ** attempt)
-                continue
-            r.raise_for_status()
-            data = r.json()
-            if data.get("status") == "1":
-                return data
-            else:
-                print(f"[ETH] API cavabı: {data.get('message', 'Unknown error')}")
-                return None
-        except requests.exceptions.RequestException as e:
-            print(f"[ETH] Fetch xətası: {e}")
+    try:
+        r = requests.get(ETH_API, params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        if data.get("status") == "1":
+            return data
+        else:
+            print(f"[ETH] API cavabı: {data.get('message', 'Unknown error')}")
             return None
-    return None
+    except requests.exceptions.RequestException as e:
+        print(f"[ETH] Fetch xətası: {e}")
+        return None
 
 
 def fetch_btc_tx(txid: str) -> Optional[dict]:
     """Konkret BTC tranzaksiyasının detalları."""
     url = f"{BTC_API}/txs/{txid}"
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            r = requests.get(url, timeout=10)
-            if r.status_code == 429:
-                print(f"[BTC TX] 429 Limit aşıldı. Gözləyirəm... ({attempt + 1}/{max_retries})")
-                time.sleep(2 ** attempt)
-                continue
-            r.raise_for_status()
-            return r.json()
-        except:
-            return None
-    return None
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        return r.json()
+    except:
+        return None
 
 
 def parse_btc_transactions(raw: dict) -> list[dict]:
