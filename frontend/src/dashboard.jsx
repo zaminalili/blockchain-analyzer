@@ -31,7 +31,7 @@ const DEMO_DATA = {
     { source: "1HLoD9E4SDFFPDiYfNYnkBLQ85Y51J3Zb1",  target: "1GkQmKAmHtNfnD3LHhTkewJxKHVSta4m2A", value: 3.0, chain: "BTC" },
     { source: "0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe", target: "0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8", value: 5.0, chain: "ETH" },
   ],
-  risk: { score: 100, level: "HIGH", color: "red" },
+  risk: { score: 100, level: "CRITICAL", color: "red" },
   stats: { nodes: 11, edges: 15, density: 0.1026, strongly_connected: 11 },
   alerts: [
     { type: "FAN_OUT",       severity: "MEDIUM", tx: "b2c3d4e5f6a1b2c3...", detail: "6 output aşkarlandı — potensial mixing" },
@@ -41,13 +41,13 @@ const DEMO_DATA = {
   ],
 };
 
-// ── Risk helpers ─────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 const riskColor = (score) => {
-  if (score >= 70) return "#ef4444";
-  if (score >= 40) return "#f59e0b";
-  return "#22c55e";
+  if (score >= 70) return "var(--risk-high)";
+  if (score >= 40) return "var(--risk-medium)";
+  return "var(--risk-low)";
 };
-const severityColor = { HIGH: "#ef4444", MEDIUM: "#f59e0b", LOW: "#6b7280" };
+const severityColor = { HIGH: "var(--risk-high)", MEDIUM: "var(--risk-medium)", LOW: "var(--text-mute)" };
 const chainColor = { BTC: "#f7931a", ETH: "#627eea" };
 
 // ── D3 Force Graph ────────────────────────────────────────────────────────────
@@ -56,11 +56,11 @@ function ForceGraph({ data, onNodeClick }) {
   const simRef = useRef(null);
 
   useEffect(() => {
-    if (!data || !svgRef.current) return;
+    if (!data || !data.nodes || !data.links || !svgRef.current) return;
 
     const el  = svgRef.current;
-    const W   = el.clientWidth  || 700;
-    const H   = el.clientHeight || 440;
+    const W   = el.clientWidth  || 800;
+    const H   = el.clientHeight || 500;
 
     d3.select(el).selectAll("*").remove();
 
@@ -70,127 +70,155 @@ function ForceGraph({ data, onNodeClick }) {
 
     // Zoom
     const g = svg.append("g");
-    svg.call(d3.zoom().scaleExtent([0.3, 3]).on("zoom", e => g.attr("transform", e.transform)));
+    svg.call(d3.zoom().scaleExtent([0.2, 4]).on("zoom", e => g.attr("transform", e.transform)));
 
-    // Defs: arrow marker
-    svg.append("defs").append("marker")
+    // Defs: Glow filters and markers
+    const defs = svg.append("defs");
+    
+    // Node Glow
+    const filter = defs.append("filter").attr("id", "glow").attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
+    filter.append("feGaussianBlur").attr("stdDeviation", "2.5").attr("result", "coloredBlur");
+    const feMerge = filter.append("feMerge");
+    feMerge.append("feMergeNode").attr("in", "coloredBlur");
+    feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+    // Arrowhead
+    defs.append("marker")
       .attr("id", "arrowhead")
       .attr("viewBox", "0 -4 8 8")
-      .attr("refX", 18).attr("refY", 0)
-      .attr("markerWidth", 6).attr("markerHeight", 6)
+      .attr("refX", 22).attr("refY", 0)
+      .attr("markerWidth", 5).attr("markerHeight", 5)
       .attr("orient", "auto")
       .append("path")
       .attr("d", "M0,-4L8,0L0,4")
-      .attr("fill", "#475569");
+      .attr("fill", "var(--text-mute)");
 
-    // Deep copy nodes/links for simulation
     const nodes = data.nodes.map(d => ({ ...d }));
     const links = data.links.map(d => ({ ...d }));
 
-    // Simulation
     const sim = d3.forceSimulation(nodes)
-      .force("link",   d3.forceLink(links).id(d => d.id).distance(90).strength(0.6))
-      .force("charge", d3.forceManyBody().strength(-280))
+      .force("link",   d3.forceLink(links).id(d => d.id).distance(120).strength(0.5))
+      .force("charge", d3.forceManyBody().strength(-400))
       .force("center", d3.forceCenter(W / 2, H / 2))
-      .force("collide", d3.forceCollide(28));
+      .force("collide", d3.forceCollide(40));
     simRef.current = sim;
 
-    // Links
     const link = g.append("g").selectAll("line").data(links).join("line")
-      .attr("stroke", d => chainColor[d.chain] || "#475569")
-      .attr("stroke-opacity", 0.35)
-      .attr("stroke-width", d => Math.max(1, Math.log(d.value + 1) * 1.5))
+      .attr("stroke", d => chainColor[d.chain] || "var(--border-dim)")
+      .attr("stroke-opacity", 0.4)
+      .attr("stroke-width", d => Math.max(1.5, Math.log(d.value + 1) * 2))
       .attr("marker-end", "url(#arrowhead)");
 
-    // Link value labels
     const linkLabel = g.append("g").selectAll("text").data(links).join("text")
-      .attr("font-size", 9)
-      .attr("fill", "#64748b")
+      .attr("font-size", 10)
+      .attr("font-family", "var(--font-mono)")
+      .attr("fill", "var(--text-mute)")
       .attr("text-anchor", "middle")
-      .text(d => d.value + (d.chain === "BTC" ? "₿" : "Ξ"));
+      .text(d => d.value + (d.chain === "BTC" ? " ₿" : " Ξ"));
 
-    // Node groups
     const node = g.append("g").selectAll("g").data(nodes).join("g")
       .style("cursor", "pointer")
-      .call(d3.drag()
-        .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-        .on("drag",  (e, d) => { d.fx = e.x; d.fy = e.y; })
-        .on("end",   (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
-      )
       .on("click", (e, d) => { e.stopPropagation(); onNodeClick && onNodeClick(d); });
 
-    // Outer glow ring for queried node
+    // Node interactions
+    node.call(d3.drag()
+      .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on("drag",  (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on("end",   (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+    // Queried indicator
     node.filter(d => d.is_queried)
       .append("circle")
-      .attr("r", 22)
+      .attr("r", 26)
       .attr("fill", "none")
-      .attr("stroke", "#f59e0b")
+      .attr("stroke", "var(--accent-primary)")
       .attr("stroke-width", 2)
       .attr("stroke-dasharray", "4 2")
-      .attr("opacity", 0.7);
+      .append("animateTransform")
+      .attr("attributeName", "transform")
+      .attr("type", "rotate")
+      .attr("from", "0 0 0")
+      .attr("to", "360 0 0")
+      .attr("dur", "10s")
+      .attr("repeatCount", "indefinite");
 
-    // Risk ring
+    // Main Circle
     node.append("circle")
-      .attr("r", 16)
-      .attr("fill", d => riskColor(d.risk) + "22")
+      .attr("r", 18)
+      .attr("fill", d => riskColor(d.risk))
+      .attr("fill-opacity", 0.1)
       .attr("stroke", d => riskColor(d.risk))
-      .attr("stroke-width", d => d.is_queried ? 2.5 : 1.5);
+      .attr("stroke-width", 2)
+      .attr("filter", d => d.risk > 70 ? "url(#glow)" : null);
 
-    // Chain icon
-    node.append("text")
-      .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "central")
-      .attr("font-size", 11)
-      .attr("font-weight", "600")
-      .attr("fill", d => chainColor[d.chain] || "#94a3b8")
-      .text(d => d.chain === "BTC" ? "₿" : "Ξ");
+    // Label Background
+    node.append("rect")
+      .attr("x", -30)
+      .attr("y", 22)
+      .attr("width", 60)
+      .attr("height", 14)
+      .attr("rx", 4)
+      .attr("fill", "var(--bg-main)")
+      .attr("opacity", 0.9);
 
     // Label
     node.append("text")
-      .attr("y", 26)
+      .attr("y", 32)
       .attr("text-anchor", "middle")
-      .attr("font-size", 9)
-      .attr("fill", "#94a3b8")
+      .attr("font-size", 10)
+      .attr("font-family", "var(--font-mono)")
+      .attr("fill", "var(--text-dim)")
       .text(d => d.label);
 
-    // Tick
+    // Icon/Text center
+    node.append("text")
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "central")
+      .attr("font-size", 12)
+      .attr("font-weight", "700")
+      .attr("fill", d => chainColor[d.chain])
+      .text(d => d.chain === "BTC" ? "₿" : "Ξ");
+
     sim.on("tick", () => {
-      link
-        .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
-        .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
-      linkLabel
-        .attr("x", d => (d.source.x + d.target.x) / 2)
-        .attr("y", d => (d.source.y + d.target.y) / 2 - 5);
-      node.attr("transform", d => `translate(${d.x},${d.y})`);
+      link.attr("x1", d => d.source?.x || 0).attr("y1", d => d.source?.y || 0)
+          .attr("x2", d => d.target?.x || 0).attr("y2", d => d.target?.y || 0);
+      linkLabel.attr("x", d => ((d.source?.x || 0) + (d.target?.x || 0)) / 2)
+                .attr("y", d => ((d.source?.y || 0) + (d.target?.y || 0)) / 2 - 8);
+      node.attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
     });
 
     return () => sim.stop();
   }, [data]);
 
-  return (
-    <svg ref={svgRef} style={{ width: "100%", height: "100%", display: "block" }} />
-  );
+  return <svg ref={svgRef} style={{ width: "100%", height: "100%" }} />;
 }
 
 // ── Risk Gauge ────────────────────────────────────────────────────────────────
 function RiskGauge({ score }) {
-  const r = 48, cx = 64, cy = 64;
+  const r = 40, cx = 60, cy = 60;
   const circ = 2 * Math.PI * r;
   const fill  = (score / 100) * circ;
   const color = riskColor(score);
   return (
-    <svg width="128" height="80" viewBox="0 0 128 80">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1e293b" strokeWidth="10"/>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="10"
-        strokeDasharray={`${fill} ${circ - fill}`}
-        strokeDashoffset={circ * 0.25}
-        strokeLinecap="round"
-        style={{ transition: "stroke-dasharray 1s ease" }}
-      />
-      <text x={cx} y={cy - 2} textAnchor="middle" dominantBaseline="central"
-        fontSize="22" fontWeight="700" fill={color}>{score}</text>
-      <text x={cx} y={cx + 18} textAnchor="middle" fontSize="10" fill="#64748b">/ 100</text>
-    </svg>
+    <div style={{ position: 'relative', width: 120, height: 100, margin: '0 auto' }}>
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border-dim)" strokeWidth="8"/>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="8"
+          strokeDasharray={`${fill} ${circ - fill}`}
+          strokeDashoffset={circ * 0.25}
+          strokeLinecap="round"
+          style={{ transition: "stroke-dasharray 1.5s cubic-bezier(0.4, 0, 0.2, 1)" }}
+        />
+      </svg>
+      <div style={{
+        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: 24, fontWeight: 700, color: color, fontFamily: 'var(--font-heading)' }}>{score}</div>
+        <div style={{ fontSize: 10, color: 'var(--text-mute)', marginTop: -4 }}>XAL</div>
+      </div>
+    </div>
   );
 }
 
@@ -202,11 +230,10 @@ export default function Dashboard() {
   const [loading,   setLoading]   = useState(false);
   const [selected,  setSelected]  = useState(null);
   const [apiUrl,    setApiUrl]    = useState("http://localhost:8000");
-  const [apiStatus, setApiStatus] = useState("demo"); // "demo" | "live" | "error"
+  const [apiStatus, setApiStatus] = useState("demo");
 
-  // API health yoxla
   useEffect(() => {
-    fetch(`${apiUrl}/health`, { signal: AbortSignal.timeout(2000) })
+    fetch(`${apiUrl}/health`, { signal: AbortSignal.timeout(1500) })
       .then(r => r.ok ? setApiStatus("live") : setApiStatus("error"))
       .catch(() => setApiStatus("demo"));
   }, [apiUrl]);
@@ -217,11 +244,12 @@ export default function Dashboard() {
     try {
       if (apiStatus === "live") {
         const r = await fetch(`${apiUrl}/graph/${chain}/${input}`);
+        if (!r.ok) throw new Error("API request failed");
         const d = await r.json();
+        if (!d.nodes || !d.links) throw new Error("Invalid API response format");
         setData(d);
       } else {
-        // Demo mode — offline data
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 800));
         setData({ ...DEMO_DATA, queried_address: input, chain });
       }
     } catch {
@@ -231,265 +259,222 @@ export default function Dashboard() {
     }
   }, [input, chain, apiUrl, apiStatus]);
 
-  const riskLevel = data?.risk?.level || "LOW";
-  const riskScore = data?.risk?.score || 0;
-
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#020c14",
-      color: "#e2e8f0",
-      fontFamily: "'IBM Plex Mono', 'Courier New', monospace",
-      padding: "0",
-    }}>
-
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      
       {/* ── Header ── */}
-      <header style={{
-        borderBottom: "1px solid #0f2744",
-        padding: "14px 24px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        background: "#040f1c",
+      <header className="glass-effect" style={{
+        padding: "1rem 2rem", display: "flex", alignItems: "center", justifyContent: 'space-between',
+        zIndex: 10, borderTop: 'none', borderLeft: 'none', borderRight: 'none',
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <svg width="28" height="28" viewBox="0 0 28 28">
-            <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill="none" stroke="#f59e0b" strokeWidth="1.5"/>
-            <polygon points="14,7 21,11 21,17 14,21 7,17 7,11" fill="#f59e0b22" stroke="#f59e0b" strokeWidth="1"/>
-            <circle cx="14" cy="14" r="3" fill="#f59e0b"/>
-          </svg>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc", letterSpacing: "0.05em" }}>
-            AZ BLOCKCHAIN ANALYZER
-          </span>
-        </div>
-        <span style={{ fontSize: 10, color: "#334155", marginLeft: 4 }}>
-          KRİMİNALİSTİK PROTOTİP v1.0
-        </span>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{
-            fontSize: 10, padding: "3px 10px", borderRadius: 20,
-            background: apiStatus === "live" ? "#14532d44" : "#1e1e2e",
-            border: `1px solid ${apiStatus === "live" ? "#22c55e" : "#334155"}`,
-            color: apiStatus === "live" ? "#22c55e" : "#64748b",
+        <div style={{ display: "flex", alignItems: "center", gap: '0.75rem' }}>
+          <div style={{ 
+            width: 32, height: 32, background: 'var(--accent-primary)', borderRadius: '8px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 15px var(--accent-glow)'
           }}>
-            {apiStatus === "live" ? "● API CANLI" : "● DEMO REJIM"}
-          </span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <div>
+            <h1 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700 }} className="text-gradient">
+              AZ BLOKÇEYN ANALİZATORU
+            </h1>
+            <p style={{ fontSize: '0.65rem', color: 'var(--text-mute)', margin: 0, letterSpacing: '0.1em' }}>
+              ŞƏFFAF KRİMİNALİSTİKA v1.2
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.5)', padding: 4, borderRadius: 8, border: '1px solid var(--border-dim)' }}>
+            {["BTC", "ETH"].map(c => (
+              <button key={c} onClick={() => setChain(c)} style={{
+                padding: "6px 14px", border: "none", cursor: "pointer", fontSize: '0.75rem',
+                background: chain === c ? 'var(--accent-primary)' : "transparent",
+                color: chain === c ? "#fff" : "var(--text-mute)",
+                borderRadius: 6, fontWeight: 600,
+              }}>{c}</button>
+            ))}
+          </div>
+          
+          <div style={{ 
+            fontSize: '0.7rem', padding: "4px 12px", borderRadius: 20,
+            background: apiStatus === "live" ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)",
+            border: `1px solid ${apiStatus === "live" ? "var(--risk-low)" : "var(--risk-medium)"}`,
+            color: apiStatus === "live" ? "var(--risk-low)" : "var(--risk-medium)",
+            fontWeight: 500
+          }}>
+            {apiStatus === "live" ? "API AKTİVDİR" : "DEMO REJİM"}
+          </div>
         </div>
       </header>
 
-      {/* ── Search bar ── */}
-      <div style={{
-        padding: "16px 24px",
-        background: "#040f1c",
-        borderBottom: "1px solid #0f2744",
-        display: "flex", gap: 10, flexWrap: "wrap",
-      }}>
-        {/* Chain selector */}
-        <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid #1e3a5f" }}>
-          {["BTC", "ETH"].map(c => (
-            <button key={c} onClick={() => setChain(c)} style={{
-              padding: "8px 16px", border: "none", cursor: "pointer", fontSize: 12,
-              background: chain === c ? chainColor[c] + "33" : "transparent",
-              color: chain === c ? chainColor[c] : "#64748b",
-              fontFamily: "inherit", fontWeight: 700,
-              borderRight: c === "BTC" ? "1px solid #1e3a5f" : "none",
-            }}>{c}</button>
-          ))}
-        </div>
-
-        {/* Address input */}
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && analyze()}
-          placeholder="Wallet ünvanı daxil edin..."
-          style={{
-            flex: 1, minWidth: 260,
-            background: "#0a1929", border: "1px solid #1e3a5f",
-            borderRadius: 6, padding: "8px 14px",
-            color: "#e2e8f0", fontSize: 12, fontFamily: "inherit",
-            outline: "none",
-          }}
-        />
-
-        <button onClick={analyze} disabled={loading} style={{
-          padding: "8px 20px", borderRadius: 6, border: "none",
-          background: loading ? "#1e3a5f" : "#1d4ed8",
-          color: "#fff", cursor: loading ? "not-allowed" : "pointer",
-          fontSize: 12, fontFamily: "inherit", fontWeight: 700,
-          letterSpacing: "0.05em",
+      {/* ── Main Content Area ── */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        
+        {/* ── Left Sidebar ── */}
+        <aside className="glass-effect" style={{
+          width: 320, flexShrink: 0, padding: '1.5rem', overflowY: 'auto',
+          display: 'flex', flexDirection: 'column', gap: '1.5rem',
+          borderTop: 'none', borderBottom: 'none', borderLeft: 'none'
         }}>
-          {loading ? "ANALİZ EDİLİR..." : "ANALİZ ET"}
-        </button>
-
-        {/* API URL (collapsible) */}
-        <input
-          value={apiUrl}
-          onChange={e => setApiUrl(e.target.value)}
-          placeholder="API URL"
-          style={{
-            width: 180, background: "#0a1929", border: "1px solid #0f2744",
-            borderRadius: 6, padding: "8px 10px",
-            color: "#475569", fontSize: 11, fontFamily: "inherit", outline: "none",
-          }}
-        />
-      </div>
-
-      {/* ── Main content ── */}
-      <div style={{ display: "flex", height: "calc(100vh - 140px)", overflow: "hidden" }}>
-
-        {/* ── Left sidebar ── */}
-        <aside style={{
-          width: 260, flexShrink: 0,
-          background: "#040f1c",
-          borderRight: "1px solid #0f2744",
-          overflowY: "auto", padding: 16,
-          display: "flex", flexDirection: "column", gap: 16,
-        }}>
-
-          {/* Risk Card */}
-          <div style={{
-            background: "#0a1929",
-            border: `1px solid ${riskColor(riskScore)}44`,
-            borderRadius: 10, padding: 16, textAlign: "center",
-          }}>
-            <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8, letterSpacing: "0.1em" }}>
-              RİSK QİYMƏTLƏNDİRMƏSİ
-            </div>
-            <RiskGauge score={riskScore} />
-            <div style={{
-              marginTop: 8, fontSize: 13, fontWeight: 700,
-              color: riskColor(riskScore), letterSpacing: "0.1em",
+          
+          {/* Search Box */}
+          <div className="glass-effect" style={{ padding: '1rem', borderRadius: 12, border: '1px solid var(--border-bright)' }}>
+             <label style={{ fontSize: '0.7rem', color: 'var(--text-mute)', display: 'block', marginBottom: 8 }}>CÜZDAN ÜNVANI</label>
+             <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && analyze()}
+              placeholder="0x... or 1Bv..."
+              style={{
+                width: '100%', background: 'rgba(255,255,255,0.5)', border: '1px solid var(--border-dim)',
+                borderRadius: 6, padding: '10px 12px', color: 'var(--text-main)', fontSize: '0.75rem',
+                fontFamily: 'var(--font-mono)', marginBottom: 12, outline: 'none'
+              }}
+            />
+            <button onClick={analyze} disabled={loading} style={{
+              width: '100%', padding: '10px', borderRadius: 8, border: 'none',
+              background: loading ? 'var(--text-mute)' : 'var(--accent-primary)',
+              color: '#fff', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
+              boxShadow: loading ? 'none' : '0 4px 15px var(--accent-glow)'
             }}>
-              {riskLevel}
-            </div>
-            <div style={{ fontSize: 10, color: "#475569", marginTop: 4 }}>
-              {riskLevel === "HIGH"   && "Dərhal istintaq açılsın"}
-              {riskLevel === "MEDIUM" && "Əlavə araşdırma lazımdır"}
-              {riskLevel === "LOW"    && "Adi monitorinq kifayətdir"}
+              {loading ? "ANALİZ EDİLİR..." : "ANALİZƏ BAŞLA"}
+            </button>
+          </div>
+
+          {/* Risk Summary */}
+          <div className="glass-effect" style={{ padding: '1.5rem', borderRadius: 12, textAlign: 'center' }}>
+            <h3 style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '1rem' }}>RİSK QİYMƏTLƏNDİRMƏSİ</h3>
+            <RiskGauge score={data?.risk?.score || 0} />
+            <div style={{ 
+              marginTop: '1rem', padding: '6px 12px', borderRadius: 6,
+              background: riskColor(data?.risk?.score) + '11',
+              border: `1px solid ${riskColor(data?.risk?.score)}33`,
+              color: riskColor(data?.risk?.score), fontWeight: 700, fontSize: '0.9rem'
+            }}>
+              {data?.risk?.level}
             </div>
           </div>
 
-          {/* Stats */}
-          <div style={{ background: "#0a1929", borderRadius: 10, padding: 14, border: "1px solid #0f2744" }}>
-            <div style={{ fontSize: 10, color: "#64748b", marginBottom: 10, letterSpacing: "0.1em" }}>
-              QRAF STATİSTİKASI
-            </div>
+          {/* Analytics Stats */}
+          <div className="glass-effect" style={{ padding: '1.25rem', borderRadius: 12 }}>
+            <h3 style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginBottom: '1rem' }}>ŞƏBƏKƏ TELEMETRİYASI</h3>
             {[
-              ["Node",       data?.stats?.nodes || data?.nodes?.length || 0],
-              ["Edge",       data?.stats?.edges || data?.links?.length || 0],
-              ["Sıxlıq",    data?.stats?.density?.toFixed(4) || "—"],
-              ["Komponent", data?.stats?.strongly_connected || "—"],
-            ].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", marginBottom: 7 }}>
-                <span style={{ fontSize: 11, color: "#64748b" }}>{k}</span>
-                <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>{v}</span>
+              { l: "Ümumi Qovşaqlar", v: data?.stats?.nodes || data?.nodes?.length },
+              { l: "Əlaqələr", v: data?.stats?.edges || data?.links?.length },
+              { l: "Sıxlıq Xalı", v: data?.stats?.density?.toFixed(4) || "0.0000" },
+              { l: "Bağlı Qruplar", v: data?.stats?.strongly_connected || "1" }
+            ].map((s, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-mute)' }}>{s.l}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{s.v}</span>
               </div>
             ))}
           </div>
 
-          {/* Alerts */}
-          <div style={{ background: "#0a1929", borderRadius: 10, padding: 14, border: "1px solid #0f2744" }}>
-            <div style={{ fontSize: 10, color: "#64748b", marginBottom: 10, letterSpacing: "0.1em" }}>
-              XƏBƏRDARLIQLAR ({data?.alerts?.length || 0})
-            </div>
-            {(data?.alerts || []).map((a, i) => (
-              <div key={i} style={{
-                marginBottom: 8, padding: "8px 10px",
-                background: severityColor[a.severity] + "11",
-                border: `1px solid ${severityColor[a.severity]}33`,
-                borderRadius: 6,
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: severityColor[a.severity] }}>
-                    {a.type}
-                  </span>
-                  <span style={{ fontSize: 9, color: severityColor[a.severity], opacity: 0.7 }}>
-                    {a.severity}
-                  </span>
+          {/* Alerts Section */}
+          <div>
+            <h3 style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between' }}>
+              AKTİV BİLDİRİŞLƏR
+              <span style={{ color: 'var(--risk-high)' }}>● {data?.alerts?.length || 0}</span>
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {(data?.alerts || []).map((a, i) => (
+                <div key={i} style={{
+                  padding: '10px', borderRadius: 8, background: 'rgba(0,0,0,0.02)',
+                  border: `1px solid ${severityColor[a.severity]}44`
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: severityColor[a.severity] }}>{a.type}</span>
+                    <span style={{ fontSize: '0.6rem', color: 'var(--text-mute)' }}>{a.severity}</span>
+                  </div>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: 0, lineHeight: 1.4 }}>{a.detail}</p>
                 </div>
-                <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.4 }}>{a.detail}</div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
-          {/* Chain legend */}
-          <div style={{ background: "#0a1929", borderRadius: 10, padding: 14, border: "1px solid #0f2744" }}>
-            <div style={{ fontSize: 10, color: "#64748b", marginBottom: 10, letterSpacing: "0.1em" }}>RƏNG CƏDVƏLİ</div>
-            {[["#ef4444","Yüksək risk (70+)"],["#f59e0b","Orta risk (40–69)"],["#22c55e","Aşağı risk (0–39)"],
-              ["#f7931a","Bitcoin şəbəkəsi"],["#627eea","Ethereum şəbəkəsi"]].map(([c, l]) => (
-              <div key={l} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <div style={{ width: 10, height: 10, borderRadius: 2, background: c, flexShrink: 0 }} />
-                <span style={{ fontSize: 10, color: "#64748b" }}>{l}</span>
-              </div>
-            ))}
-          </div>
         </aside>
 
-        {/* ── Graph + detail ── */}
-        <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {/* ── Main Canvas ── */}
+        <main style={{ flex: 1, position: 'relative', background: 'radial-gradient(circle at center, #f1f5f9 0%, #f8fafc 100%)' }}>
+          
+          <ForceGraph data={data} onNodeClick={setSelected} />
 
-          {/* Graph canvas */}
-          <div style={{ flex: 1, position: "relative", background: "#020c14" }}>
-            <ForceGraph data={data} onNodeClick={setSelected} />
+          {/* Floating UI: Target Info */}
+          <div className="glass-effect" style={{
+            position: 'absolute', top: 20, left: 20, padding: '12px 16px', borderRadius: 12,
+            maxWidth: 400
+          }}>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-mute)', marginBottom: 4, letterSpacing: '0.05em' }}>HƏDƏF OBYEKT</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{data?.queried_address}</div>
+          </div>
 
-            {/* Overlay: queried address */}
-            <div style={{
-              position: "absolute", top: 14, left: 14,
-              background: "#040f1ccc", backdropFilter: "blur(6px)",
-              border: "1px solid #1e3a5f", borderRadius: 8,
-              padding: "8px 12px", maxWidth: 340,
-            }}>
-              <div style={{ fontSize: 9, color: "#475569", marginBottom: 3 }}>SORĞULANAN ÜNVAN</div>
-              <div style={{ fontSize: 11, color: "#f59e0b", wordBreak: "break-all" }}>
-                {data?.queried_address}
-              </div>
+          {/* Legend Overlay */}
+          <div className="glass-effect" style={{
+            position: 'absolute', bottom: 20, left: 20, padding: '10px 14px', borderRadius: 10,
+            display: 'flex', gap: '1rem', fontSize: '0.65rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--risk-high)' }}/> Yüksək Risk
             </div>
-
-            {/* Zoom hint */}
-            <div style={{
-              position: "absolute", bottom: 14, right: 14,
-              fontSize: 10, color: "#1e3a5f",
-            }}>
-              Scroll: zoom · Sürüklə: hərəkət · Node: klik
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--risk-medium)' }}/> Orta
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--risk-low)' }}/> Aşağı
             </div>
           </div>
 
-          {/* ── Node detail panel ── */}
+          {/* Interactive Hint */}
+          <div style={{ position: 'absolute', bottom: 20, right: 20, fontSize: '0.65rem', color: 'var(--text-mute)' }}>
+            QOVŞAQLARI YERDƏYİŞDİRİN · YAXINLAŞDIRIN · DETALLAR ÜÇÜN KLİKLƏYİN
+          </div>
+
+          {/* Detail Panel Float */}
           {selected && (
-            <div style={{
-              height: 140, background: "#040f1c",
-              borderTop: `1px solid ${riskColor(selected.risk)}55`,
-              padding: "14px 20px",
-              display: "flex", gap: 24, alignItems: "center",
+            <div className="glass-effect" style={{
+              position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+              width: '90%', maxWidth: 800, padding: '1.5rem', borderRadius: 16,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              animation: 'slideUp 0.3s ease-out',
+              border: `1px solid ${riskColor(selected.risk)}66`
             }}>
               <div>
-                <div style={{ fontSize: 9, color: "#475569", marginBottom: 4 }}>SEÇİLMİŞ NODE</div>
-                <div style={{ fontSize: 12, color: "#e2e8f0", wordBreak: "break-all", maxWidth: 420 }}>
-                  {selected.id}
-                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-mute)', marginBottom: 6 }}>SEÇİLMİŞ QOVŞAQ MƏLUMATLARI</div>
+                <div style={{ fontSize: '1.1rem', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-main)' }}>{selected.id}</div>
               </div>
-              <div style={{ display: "flex", gap: 24, marginLeft: "auto" }}>
-                {[
-                  ["Şəbəkə",     selected.chain, chainColor[selected.chain]],
-                  ["Risk Skoru", selected.risk + "/100", riskColor(selected.risk)],
-                  ["Sorğulanan", selected.is_queried ? "Bəli" : "Xeyr", selected.is_queried ? "#f59e0b" : "#475569"],
-                ].map(([k, v, c]) => (
-                  <div key={k} style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 9, color: "#475569", marginBottom: 4 }}>{k}</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: c }}>{v}</div>
-                  </div>
-                ))}
+              
+              <div style={{ display: 'flex', gap: '2.5rem' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-mute)', marginBottom: 4 }}>ŞƏBƏKƏ</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: chainColor[selected.chain] }}>{selected.chain}</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-mute)', marginBottom: 4 }}>RİSK İNDEKSİ</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: riskColor(selected.risk) }}>{selected.risk}%</div>
+                </div>
                 <button onClick={() => setSelected(null)} style={{
-                  background: "transparent", border: "1px solid #1e3a5f",
-                  color: "#475569", borderRadius: 6, padding: "4px 12px",
-                  cursor: "pointer", fontSize: 11, fontFamily: "inherit",
+                  background: 'rgba(0,0,0,0.03)', border: '1px solid var(--border-dim)',
+                  width: 32, height: 32, borderRadius: '50%', color: 'var(--text-mute)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
                 }}>✕</button>
               </div>
             </div>
           )}
+
         </main>
       </div>
+
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translate(-50%, 100%); opacity: 0; }
+          to { transform: translate(-50%, 0); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

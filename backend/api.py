@@ -298,7 +298,7 @@ async def get_graph_data(
     for tx in full.transactions:
         for inp in tx.inputs:
             for out in tx.outputs:
-                if inp and out and inp != out:
+                if inp and out and inp != out and inp != "unknown" and out != "unknown":
                     links.append({
                         "source": inp,
                         "target": out,
