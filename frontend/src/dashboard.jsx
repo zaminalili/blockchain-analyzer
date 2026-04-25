@@ -282,7 +282,7 @@ export default function Dashboard() {
   const [data, setData] = useState({ ...DEMO_DATA, is_demo: true });
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [apiUrl, setApiUrl] = useState("http://localhost:8000");
+  const [apiUrl, setApiUrl] = useState(import.meta.env.VITE_API_URL || "http://localhost:8000");
   const [apiStatus, setApiStatus] = useState("demo");
 
   useEffect(() => {
