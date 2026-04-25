@@ -110,7 +110,7 @@ DEMO_TRANSACTIONS = [
 
 # ── Helper: transactions → AnalyzeResponse ───────────────────────────────────
 
-def build_response(address: str, chain: str, transactions: list[dict]) -> AnalyzeResponse:
+def build_response(address: str, chain: str, transactions: list[dict], is_demo: bool = False) -> AnalyzeResponse:
     """Tranzaksiya listindən tam response obyekti qur."""
 
     # Standart output formatı
@@ -162,6 +162,7 @@ def build_response(address: str, chain: str, transactions: list[dict]) -> Analyz
         alerts=alerts_out,
         risk=risk_out,
         analyzed_at=datetime.now(timezone.utc).isoformat(),
+        is_demo=is_demo,
     )
 
 
@@ -189,23 +190,30 @@ async def analyze_address(req: AnalyzeRequest):
     """
     transactions = []
 
-    if req.chain == "BTC":
-        raw = fetch_btc_address(req.address, limit=req.limit)
-        if raw:
-            transactions = parse_btc_transactions(raw)
+    try:
+        if req.chain == "BTC":
+            raw = fetch_btc_address(req.address, limit=req.limit)
+            if raw:
+                transactions = parse_btc_transactions(raw)
 
-    elif req.chain == "ETH":
-        raw = fetch_eth_address(req.address, limit=req.limit)
-        if raw:
-            transactions = parse_eth_transactions(raw, req.address)
+        elif req.chain == "ETH":
+            raw = fetch_eth_address(req.address, limit=req.limit)
+            if raw:
+                transactions = parse_eth_transactions(raw, req.address)
+    except ValueError as e:
+        if str(e) == "429":
+            raise HTTPException(status_code=429, detail="API limiti aşıldı, zəhmət olmasa bir qədər sonra yenidən cəhd edin.")
+        raise e
 
     # API əlçatmaz olsa demo data ilə davam et
+    is_demo = False
     if not transactions:
+        is_demo = True
         transactions = [t for t in DEMO_TRANSACTIONS if t["chain"] == req.chain.value]
         if not transactions:
             transactions = DEMO_TRANSACTIONS
 
-    return build_response(req.address, req.chain.value, transactions)
+    return build_response(req.address, req.chain.value, transactions, is_demo=is_demo)
 
 
 @app.post("/analyze/batch", tags=["Analysis"])
@@ -314,6 +322,7 @@ async def get_graph_data(
         "links":  links,
         "risk":   full.risk.model_dump(),
         "stats":  full.graph_stats.model_dump() if full.graph_stats else {},
+        "is_demo": full.is_demo,
     }
 
 
@@ -327,4 +336,5 @@ async def demo_analyze():
         address="1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2",
         chain="BTC",
         transactions=DEMO_TRANSACTIONS,
+        is_demo=True,
     )

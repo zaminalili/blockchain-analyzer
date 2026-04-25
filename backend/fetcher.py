@@ -21,8 +21,12 @@ def fetch_btc_address(address: str, limit: int = 20) -> Optional[dict]:
     params = {"limit": limit, "includeHex": False}
     try:
         r = requests.get(url, params=params, timeout=10)
+        if r.status_code == 429:
+            raise ValueError("429")
         r.raise_for_status()
         return r.json()
+    except ValueError:
+        raise
     except requests.exceptions.RequestException as e:
         print(f"[BTC] Fetch xətası: {e}")
         return None
@@ -43,6 +47,8 @@ def fetch_eth_address(address: str, limit: int = 20) -> Optional[dict]:
     }
     try:
         r = requests.get(ETH_API, params=params, timeout=10)
+        if r.status_code == 429:
+            raise ValueError("429")
         r.raise_for_status()
         data = r.json()
         if data.get("status") == "1":
@@ -50,6 +56,8 @@ def fetch_eth_address(address: str, limit: int = 20) -> Optional[dict]:
         else:
             print(f"[ETH] API cavabı: {data.get('message', 'Unknown error')}")
             return None
+    except ValueError:
+        raise
     except requests.exceptions.RequestException as e:
         print(f"[ETH] Fetch xətası: {e}")
         return None
@@ -60,8 +68,12 @@ def fetch_btc_tx(txid: str) -> Optional[dict]:
     url = f"{BTC_API}/txs/{txid}"
     try:
         r = requests.get(url, timeout=10)
+        if r.status_code == 429:
+            raise ValueError("429")
         r.raise_for_status()
         return r.json()
+    except ValueError:
+        raise
     except:
         return None
 

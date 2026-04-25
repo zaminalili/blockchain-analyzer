@@ -89,3 +89,5 @@ class AnalyzeResponse(BaseModel):
     alerts:         list[AlertOut]
     risk:           RiskOut
     analyzed_at:    str
+    is_demo:        bool = False
+
