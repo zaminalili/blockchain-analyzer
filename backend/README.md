@@ -1,7 +1,5 @@
-# AZ Blockchain Analyzer — FastAPI Backend
-
-Azərbaycan hüquq-mühafizə orqanları üçün blockchain kriminalistik API prototipi.  
-Diplom işi: *"Kriptovalyuta ilə cinayətlərdə blokçeyn texnologiyalarının tətbiqi"*
+# Blockchain Analyzer FastAPI Backend
+Blockchain kriminalistik API prototipi.  
 
 ---
 
@@ -28,7 +26,7 @@ ReDoc:       http://localhost:8000/redoc
 Server statusu.
 
 ### `GET /demo`
-API key olmadan offline demo analiz.
+API key olmadan oflayn analitik demo.
 
 ### `POST /analyze`
 Tək ünvan tam analizi.
@@ -41,10 +39,10 @@ Tək ünvan tam analizi.
 ```
 
 ### `POST /analyze/batch`
-Çox ünvana eyni vaxtda sorğu (max 10). Risk skoru üzrə sıralanmış cavab.
+Çox ünvana eyni vaxtda sorğu (maksimum 10). Risk skoru üzrə sıralanmış cavab.
 
 ### `GET /address/{chain}/{address}`
-Sürətli lookup — yalnız risk xülasəsi.  
+Sürətli sorğu, yalnız risk xülasəsi.  
 Nümunə: `GET /address/BTC/1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2`
 
 ### `GET /graph/{chain}/{address}`
@@ -69,17 +67,5 @@ D3.js Force Graph üçün node + link data.
 | `ROUND_NUMBER` | 10      | Tam ədəd köçürmə                      |
 | `MIXER_ADDRESS`| 50      | Bilinən mixer ünvanı                  |
 
----
 
-## Fayl strukturu
-
-```
-blockchain_analyzer/
-├── api.py          ← FastAPI app
-├── fetcher.py      ← BTC + ETH API çağırışları
-├── graph.py        ← NetworkX analiz + risk scoring
-├── models.py       ← Pydantic sxemləri
-├── main.py         ← Terminal CLI
-└── requirements.txt
-```
 
